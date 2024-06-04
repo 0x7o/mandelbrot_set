@@ -1,7 +1,7 @@
 ![Example of the set](https://i.imgur.com/Pve0Vw0.png)
 
 # Maldebroda set on Rust
-Visualization of Maldebroda set on Rust in zoom video.
+Visualization of Mandelbrot set on Rust in zoom video.
 
 Features:
 - Multi-threaded rendering
