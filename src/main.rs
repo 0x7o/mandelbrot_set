@@ -1,6 +1,5 @@
 use image::{Rgb, RgbImage};
 use libc::{c_double, c_int, c_uint};
-use num::complex::Complex;
 use rayon::prelude::*;
 use std::fs;
 use std::time::Instant;
@@ -66,21 +65,20 @@ fn generate_set(
     y_min: f64,
     x_max: f64,
     y_max: f64,
-    w: u32,
-    h: u32,
+    resolution: u32,
 ) {
     let start = Instant::now();
 
-    let mut buffer = RgbImage::new(w, h);
+    let mut buffer = RgbImage::new(resolution, resolution);
     let gradient = get_gradient(colors, max_iters);
     let mut h_cx = vec![];
     let mut h_cy = vec![];
-    let mut output = vec![0; (w * h) as usize];
+    let mut output = vec![0; (resolution * resolution) as usize];
 
-    for x in 0..w {
-        for y in 0..h {
-            let x_percent = x as f64 / w as f64;
-            let y_percent = y as f64 / h as f64;
+    for x in 0..resolution {
+        for y in 0..resolution {
+            let x_percent = x as f64 / resolution as f64;
+            let y_percent = y as f64 / resolution as f64;
             let cx = x_min + (x_max - x_min) * x_percent;
             let cy = y_min + (y_max - y_min) * y_percent;
             h_cx.push(cx);
@@ -89,12 +87,18 @@ fn generate_set(
     }
 
     unsafe {
-        calculate_mandelbrot(h_cx.as_mut_ptr(), h_cy.as_mut_ptr(), (w * h) as c_int, max_iters, output.as_mut_ptr());
+        calculate_mandelbrot(
+            h_cx.as_mut_ptr(),
+            h_cy.as_mut_ptr(),
+            (resolution * resolution) as c_int,
+            max_iters,
+            output.as_mut_ptr(),
+        );
     }
 
-    for (i, row) in output.chunks(w as usize).enumerate() {
-        for (j, column) in row.iter().enumerate() {
-            let pixel = buffer.get_pixel_mut(i as u32, j as u32);
+    for (x, row) in output.chunks(resolution as usize).enumerate() {
+        for (y, column) in row.iter().enumerate() {
+            let pixel = buffer.get_pixel_mut(x as u32, y as u32);
             let color = gradient.get(*column as usize).unwrap_or(&[0, 0, 0]);
             *pixel = Rgb(*color);
         }
@@ -102,44 +106,28 @@ fn generate_set(
 
     buffer.save(&file_name).unwrap();
     let duration = Instant::now() - start;
-    println!(
-        "Successfully rendered frame '{}' in {:?}.",
-        file_name, duration
-    );
-}
-
-fn num_iters(cx: f64, cy: f64, max_iters: u32) -> u32 {
-    let mut z = Complex::new(0.0, 0.0);
-    let c = Complex::new(cx, cy);
-
-    for i in 0..=max_iters {
-        if z.norm() > 2.0 {
-            return i;
-        }
-        z = z * z + c;
-    }
-
-    max_iters
+    println!("Rendered frame '{}' in {:?}.", file_name, duration);
 }
 
 fn main() {
-    let (w, h) = (1024, 1024);
-    let target_x = 0.0;
-    let target_y = -1.0;
-    let (a_w, a_h) = (1.0, 1.0);
-    let max_iters = 100;
-    let min_scale = 1;
-    let max_scale = 600;
+    let resolution = 2048;
+    let target_x = -0.7499662068297848;
+    let target_y = 0.04280600288545834;
+    let max_iters = 1000;
+    let max_scale = 10_i64.pow(15);
+    let fps = 60;
+    let seconds = 30;
+    let frames = fps * seconds;
 
     fs::create_dir_all("./output").unwrap();
 
-    let params: Vec<(usize, f64, f64, f64, f64)> = (min_scale..=max_scale)
+    let params: Vec<(usize, f64, f64, f64, f64)> = (0..frames)
         .map(|i| {
-            let scale = 2.0_f64.powf(i as f64 / 10.0);
-            let x_min = target_x - (a_w / scale);
-            let x_max = target_x + (a_w / scale);
-            let y_min = target_y - (a_h / scale);
-            let y_max = target_y + (a_h / scale);
+            let scale = 10.0_f64.powf((i as f64 / frames as f64) * max_scale.ilog10() as f64);
+            let x_min = target_x - (1.0 / scale);
+            let x_max = target_x + (1.0 / scale);
+            let y_min = target_y - (1.0 / scale);
+            let y_max = target_y + (1.0 / scale);
             (i, x_min, y_min, x_max, y_max)
         })
         .collect();
@@ -151,13 +139,12 @@ fn main() {
             generate_set(
                 filename,
                 max_iters,
-                vec!["#1C448E", "#6F8695", "#CEC288", "#FFE381", "#DBFE87"],
+                vec!["#0063C7", "#B0C400", "#C40C00"],
                 x_min,
                 y_min,
                 x_max,
                 y_max,
-                w,
-                h,
+                resolution
             );
         });
 }

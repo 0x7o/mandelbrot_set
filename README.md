@@ -14,5 +14,5 @@ $ cargo run
 ```
 Merge the frames into one video via `ffmpeg`:
 ```bash
-$ ffmpeg -framerate 30 -pattern_type glob -i 'output/*.png' out.mp4
+$ ffmpeg -framerate 24 -i output/fractal_%05d.png -c:v libx264 -pix_fmt yuv420p -crf 18 -y video.mp4 
 ```
