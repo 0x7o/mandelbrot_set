@@ -1,6 +1,6 @@
 ![Example of the set](https://i.imgur.com/Pve0Vw0.png)
 
-# Maldebroda set on Rust
+# Mandelbrot set on Rust
 Visualization of Mandelbrot set on Rust in zoom video.
 
 Features:
