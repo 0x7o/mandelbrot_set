@@ -1,8 +1,19 @@
-use std::fs;
 use image::{Rgb, RgbImage};
-use rayon::prelude::*;
+use libc::{c_double, c_int, c_uint};
 use num::complex::Complex;
-use std::time::{Instant};
+use rayon::prelude::*;
+use std::fs;
+use std::time::Instant;
+
+extern "C" {
+    fn calculate_mandelbrot(
+        cx: *mut c_double,
+        cy: *mut c_double,
+        num_points: c_int,
+        max_iters: c_uint,
+        output: *mut c_uint,
+    );
+}
 
 fn hex2rgb(hex: &str) -> Result<Vec<u8>, String> {
     let hex = hex.trim_start_matches('#');
@@ -62,21 +73,39 @@ fn generate_set(
 
     let mut buffer = RgbImage::new(w, h);
     let gradient = get_gradient(colors, max_iters);
+    let mut h_cx = vec![];
+    let mut h_cy = vec![];
+    let mut output = vec![0; (w * h) as usize];
+
     for x in 0..w {
         for y in 0..h {
             let x_percent = x as f64 / w as f64;
             let y_percent = y as f64 / h as f64;
             let cx = x_min + (x_max - x_min) * x_percent;
             let cy = y_min + (y_max - y_min) * y_percent;
-            let iters = num_iters(cx, cy, max_iters);
-            let pixel = buffer.get_pixel_mut(x, y);
-            let color = gradient.get(iters as usize).unwrap_or(&[0, 0, 0]);
+            h_cx.push(cx);
+            h_cy.push(cy);
+        }
+    }
+
+    unsafe {
+        calculate_mandelbrot(h_cx.as_mut_ptr(), h_cy.as_mut_ptr(), (w * h) as c_int, max_iters, output.as_mut_ptr());
+    }
+
+    for (i, row) in output.chunks(w as usize).enumerate() {
+        for (j, column) in row.iter().enumerate() {
+            let pixel = buffer.get_pixel_mut(i as u32, j as u32);
+            let color = gradient.get(*column as usize).unwrap_or(&[0, 0, 0]);
             *pixel = Rgb(*color);
         }
     }
+
     buffer.save(&file_name).unwrap();
     let duration = Instant::now() - start;
-    println!("Successfully rendered frame '{}' in {:?}.", file_name, duration);
+    println!(
+        "Successfully rendered frame '{}' in {:?}.",
+        file_name, duration
+    );
 }
 
 fn num_iters(cx: f64, cy: f64, max_iters: u32) -> u32 {
@@ -94,13 +123,13 @@ fn num_iters(cx: f64, cy: f64, max_iters: u32) -> u32 {
 }
 
 fn main() {
-    let (w, h) = (1920, 1080);
-    let target_x = -0.749;
-    let target_y = 0.1;
-    let (a_w, a_h) = (16.0, 9.0);
-    let max_iters = 5;
+    let (w, h) = (1024, 1024);
+    let target_x = 0.0;
+    let target_y = -1.0;
+    let (a_w, a_h) = (1.0, 1.0);
+    let max_iters = 100;
     let min_scale = 1;
-    let max_scale = 200;
+    let max_scale = 600;
 
     fs::create_dir_all("./output").unwrap();
 
@@ -115,18 +144,20 @@ fn main() {
         })
         .collect();
 
-    params.into_par_iter().for_each(|(i, x_min, y_min, x_max, y_max)| {
-        let filename = format!("output/fractal_{:0>5}.png", i);
-        generate_set(
-            filename,
-            max_iters,
-            vec!["#1C448E", "#6F8695", "#CEC288", "#FFE381", "#DBFE87"],
-            x_min,
-            y_min,
-            x_max,
-            y_max,
-            w,
-            h,
-        );
-    });
+    params
+        .into_par_iter()
+        .for_each(|(i, x_min, y_min, x_max, y_max)| {
+            let filename = format!("output/fractal_{:0>5}.png", i);
+            generate_set(
+                filename,
+                max_iters,
+                vec!["#1C448E", "#6F8695", "#CEC288", "#FFE381", "#DBFE87"],
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+                w,
+                h,
+            );
+        });
 }

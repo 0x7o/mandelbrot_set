@@ -7,3 +7,8 @@ edition = "2021"
 num = "0.4.3"
 image = "0.25.1"
 rayon = "1.10.0"
+libc = "0.2.155"
+rand = "0.9.0-alpha.1"
+
+[build-dependencies]
+cc = "1.0.98"
