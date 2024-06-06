@@ -12,6 +12,7 @@ Features:
 
 Known Limitations:
 - Images can only be generated with an aspect ratio of 1:1
+- Scaling is limited by float64 accuracy
 
 ## Usage
 Build the project. Make sure you have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
