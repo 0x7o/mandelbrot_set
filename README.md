@@ -14,7 +14,7 @@ Known Limitations:
 - Images can only be generated with an aspect ratio of 1:1
 
 ## Usage
-Build the project or download the binary from the [releases](https://github.com/0x7o/mandelbrot_set/releases) page.
+Build the project. Make sure you have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
 ```bash
 $ cargo build --release
 ```
@@ -23,8 +23,8 @@ Run program:
 $ ./target/release/mandelbrot_set \
     --resolution 2048 \
     --colors "#363B54, #2E76B8, #F2BF27, #528EEF, #8473BF, #B98CB4, #116A1C" \
-    --x 0.0 \
-    --y -1.0 \
+    --x -0.1528447332308126 \
+    --y 1.0400075517403413 \
     --iters 500 \
     --max-scale 1000000000000000 \
     --fps 24 \
