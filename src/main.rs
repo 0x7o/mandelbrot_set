@@ -2,7 +2,83 @@ use image::{Rgb, RgbImage};
 use libc::{c_double, c_int, c_uint};
 use rayon::prelude::*;
 use std::fs;
+use clap::Parser;
 use std::time::Instant;
+use rand::Rng;
+
+#[derive(Parser, Debug)]
+#[command(version, long_about = None)]
+#[command(about = "Mandelbrot fractal generator")]
+struct Args {
+    #[arg(short, long, default_value_t = 512)]
+    resolution: u32,
+
+    #[arg(short, long, default_value_t = String::from("#363B54, #2E76B8, #F2BF27, #528EEF, #8473BF, #B98CB4, #116A1C"))]
+    colors: String,
+
+    #[arg(short, long, allow_negative_numbers = true)]
+    x: f64,
+
+    #[arg(short, long, allow_negative_numbers = true)]
+    y: f64,
+
+    #[arg(short, long, default_value_t = 100)]
+    iters: u32,
+
+    #[arg(short, long, default_value_t = 10_i64.pow(15))]
+    max_scale: i64,
+
+    #[arg(short, long, default_value_t = 1)]
+    fps: u32,
+
+    #[arg(short, long, default_value_t = 15)]
+    seconds: u32,
+
+    #[arg(short, long, default_value_t = 8)]
+    n_samples: u32,
+
+    #[arg(short, long, default_value = "./output")]
+    output: String,
+}
+
+fn main() {
+    let args = Args::parse();
+    let frames = (args.fps * args.seconds) as usize;
+    let colors: Vec<&str> = args.colors.split(", ").collect();
+
+    println!("{:?}", args);
+    println!("Colors: {:?}", colors);
+
+    fs::create_dir_all(&args.output).unwrap();
+
+    let params: Vec<(usize, f64, f64, f64, f64)> = (0..frames)
+        .map(|i| {
+            let scale = 10.0_f64.powf((i as f64 / frames as f64) * args.max_scale.ilog10() as f64);
+            let x_min = args.x - (1.0 / scale);
+            let x_max = args.x + (1.0 / scale);
+            let y_min = args.y - (1.0 / scale);
+            let y_max = args.y + (1.0 / scale);
+            (i, x_min, y_min, x_max, y_max)
+        })
+        .collect();
+
+    params
+        .into_par_iter()
+        .for_each(|(i, x_min, y_min, x_max, y_max)| {
+            let filename = format!("{}/frame_{:09}.png", args.output, i);
+            generate_set(
+                filename,
+                args.iters,
+                colors.clone(),
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+                args.n_samples,
+                args.resolution,
+            );
+        });
+}
 
 extern "C" {
     fn calculate_mandelbrot(
@@ -65,24 +141,28 @@ fn generate_set(
     y_min: f64,
     x_max: f64,
     y_max: f64,
+    samples: u32,
     resolution: u32,
 ) {
     let start = Instant::now();
 
+    let mut rng = rand::thread_rng();
     let mut buffer = RgbImage::new(resolution, resolution);
     let gradient = get_gradient(colors, max_iters);
     let mut h_cx = vec![];
     let mut h_cy = vec![];
-    let mut output = vec![0; (resolution * resolution) as usize];
+    let mut output = vec![0; (resolution * resolution * samples) as usize];
 
     for x in 0..resolution {
         for y in 0..resolution {
-            let x_percent = x as f64 / resolution as f64;
-            let y_percent = y as f64 / resolution as f64;
-            let cx = x_min + (x_max - x_min) * x_percent;
-            let cy = y_min + (y_max - y_min) * y_percent;
-            h_cx.push(cx);
-            h_cy.push(cy);
+            for _ in 0..samples {
+                let x_percent = (x as f64 + rng.gen::<f64>()) / resolution as f64;
+                let y_percent = (y as f64 + rng.gen::<f64>()) / resolution as f64;
+                let cx = x_min + (x_max - x_min) * x_percent;
+                let cy = y_min + (y_max - y_min) * y_percent;
+                h_cx.push(cx);
+                h_cy.push(cy);
+            }
         }
     }
 
@@ -90,16 +170,20 @@ fn generate_set(
         calculate_mandelbrot(
             h_cx.as_mut_ptr(),
             h_cy.as_mut_ptr(),
-            (resolution * resolution) as c_int,
+            (resolution * resolution * samples) as c_int,
             max_iters,
             output.as_mut_ptr(),
         );
     }
 
-    for (x, row) in output.chunks(resolution as usize).enumerate() {
-        for (y, column) in row.iter().enumerate() {
+    for (x, row) in output.chunks((resolution * samples) as usize).enumerate() {
+        for (y, column) in row.chunks(samples as usize).enumerate() {
+            let mut sum = 0;
+            for iteration in column {
+                sum += *iteration as usize;
+            }
             let pixel = buffer.get_pixel_mut(x as u32, y as u32);
-            let color = gradient.get(*column as usize).unwrap_or(&[0, 0, 0]);
+            let color = gradient.get(sum / column.len()).unwrap_or(&[0, 0, 0]);
             *pixel = Rgb(*color);
         }
     }
@@ -107,44 +191,4 @@ fn generate_set(
     buffer.save(&file_name).unwrap();
     let duration = Instant::now() - start;
     println!("Rendered frame '{}' in {:?}.", file_name, duration);
-}
-
-fn main() {
-    let resolution = 2048;
-    let target_x = -0.7499662068297848;
-    let target_y = 0.04280600288545834;
-    let max_iters = 1000;
-    let max_scale = 10_i64.pow(15);
-    let fps = 60;
-    let seconds = 30;
-    let frames = fps * seconds;
-
-    fs::create_dir_all("./output").unwrap();
-
-    let params: Vec<(usize, f64, f64, f64, f64)> = (0..frames)
-        .map(|i| {
-            let scale = 10.0_f64.powf((i as f64 / frames as f64) * max_scale.ilog10() as f64);
-            let x_min = target_x - (1.0 / scale);
-            let x_max = target_x + (1.0 / scale);
-            let y_min = target_y - (1.0 / scale);
-            let y_max = target_y + (1.0 / scale);
-            (i, x_min, y_min, x_max, y_max)
-        })
-        .collect();
-
-    params
-        .into_par_iter()
-        .for_each(|(i, x_min, y_min, x_max, y_max)| {
-            let filename = format!("output/fractal_{:0>5}.png", i);
-            generate_set(
-                filename,
-                max_iters,
-                vec!["#0063C7", "#B0C400", "#C40C00"],
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                resolution
-            );
-        });
 }
