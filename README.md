@@ -1,4 +1,4 @@
-![Example of the set](https://i.imgur.com/Pve0Vw0.png)
+![Example of the set](https://i.imgur.com/QJiQYlh.png)
 
 # Mandelbrot set
 Visualization of Mandelbrot set on NVIDIA CUDA.
@@ -22,11 +22,11 @@ $ cargo build --release
 Run program:
 ```bash
 $ ./target/release/mandelbrot_set \
-    --resolution 2048 \
-    --colors "#363B54, #2E76B8, #F2BF27, #528EEF, #8473BF, #B98CB4, #116A1C" \
-    --x -0.1528447332308126 \
-    --y 1.0400075517403413 \
-    --iters 500 \
+    --resolution 1024 \
+    --colors "#00A3BC, #8B00BD, #81BD00, #BD5400" \
+    --x -0.6582034218739634 \
+    --y 0.44967917993930356 \
+    --iters 5000 \
     --max-scale 1000000000000000 \
     --fps 24 \
     --seconds 180 \

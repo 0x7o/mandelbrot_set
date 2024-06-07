@@ -5,7 +5,7 @@ fn main() {
         .cuda(true)
         .cpp(true)
         .flag("-cudart=shared")
-        .flag("-ccbin=clang")
+        .flag("-ccbin=gcc")
         .files(&["./src/mandelbrot.cpp", "./src/mandelbrot_gpu.cu"])
         .compile("mandelbrot.a");
 }
